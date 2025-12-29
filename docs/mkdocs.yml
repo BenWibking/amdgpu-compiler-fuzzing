@@ -1,0 +1,10 @@
+site_name: AMDGPU Compiler Fuzzing
+docs_dir: markdown
+site_dir: site
+theme:
+  name: mkdocs
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Installation: installation.md
+  - LLVM AMDGPU Backend: amd-aco-compiler.md

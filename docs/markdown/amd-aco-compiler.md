@@ -1,4 +1,4 @@
-# The LLVM AMDGPU Backend Is a Stochastic Dumpster Fire for HPC Users
+# Why this fuzzer exists: the LLVM AMDGPU backend is a stochastic dumpster fire
 
 If you write HIP code for AMD GPUs, you already know the reality: **LLVM’s
 AMDGPU backend regularly miscompiles high‑register‑pressure kernels**. And unfortunately, in HPC apps, those kernels are the norm. When register pressure spikes, spill
@@ -34,7 +34,7 @@ happens late in this pipeline because it must account for the final
 instruction set and calling conventions (the rules for how functions
 pass arguments and return values).
 
-![Compiler codegen flowchart](spill-hypothesis-codegen.svg)
+![Compiler codegen flowchart](amd-aco-compiler.svg)
 
 In theory, register allocation can be modeled as a graph‑coloring
 problem: each live range (the span where a value is live) is a node, and
