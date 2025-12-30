@@ -36,8 +36,9 @@ ENV AMREX_AMD_ARCH=gfx90a
 ENV CC=amdclang
 ENV CXX=amdclang++
 
-# add packages for C++ builds
-RUN zypper --non-interactive install wget tar gzip gcc gcc-fortran file gcc-c++ make cmake patch && zypper clean --all
+# add packages for C++ builds and basic GNU tools
+RUN zypper --non-interactive install wget tar gzip gcc gcc-fortran file gcc-c++ make cmake patch \
+    which coreutils findutils grep gawk sed ripgrep && zypper clean --all
 
 # Install Python headers
 RUN zypper --non-interactive install python3-devel && zypper clean --all
