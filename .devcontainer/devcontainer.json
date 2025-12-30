@@ -1,9 +1,7 @@
 // devcontainer.json
     {
       "name": "ROCm Dev Container",
-      "build": {
-        "dockerfile": "Dockerfile"
-      },
+      "image": "ghcr.io/benwibking/amdgpu-compiler-fuzzing/linux-amd64-rocm-fuzzer",
       "hostRequirements": {
         "cpus": 4
       },

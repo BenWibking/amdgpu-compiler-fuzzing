@@ -17,3 +17,17 @@ Docs are in `docs/markdown/` and can be built with MkDocs:
 mkdocs build -f docs/mkdocs.yml
 mkdocs serve -f docs/mkdocs.yml
 ```
+
+## Devcontainer CLI
+
+You can run the tooling inside the devcontainer with the devcontainer CLI:
+
+```sh
+devcontainer up --workspace-folder .
+devcontainer exec --workspace-folder . -- ./tools/spill_fuzz/spill_fuzz.py \
+  --corpus llvm-project/llvm/test/CodeGen/AMDGPU \
+  --llc llvm-project/build/bin/llc \
+  --mcpu gfx90a \
+  --passes greedy \
+  --iterations 50
+```
