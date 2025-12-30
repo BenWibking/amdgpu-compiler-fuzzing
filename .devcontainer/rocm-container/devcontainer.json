@@ -1,6 +1,6 @@
 // devcontainer.json
     {
-      "name": "Quokka ROCm Dev Container",
+      "name": "ROCm Dev Container",
       "image": "linux-amd64-rocm-fuzzer:main",
       "hostRequirements": {
         "cpus": 4
@@ -18,7 +18,7 @@
           ]
         }
       },
-      "remoteUser": "ubuntu",
+      "remoteUser": "leap",
       // we need to manually checkout the submodules,
       // but VSCode may try to configure CMake before they are fully checked-out.
       // workaround TBD
