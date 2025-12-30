@@ -97,11 +97,30 @@ The `tools/spill_fuzz/pele_hip_to_ll.sh` wrapper builds a HIP reproducer using
 next to the kernel source. Optional `--kernel` extraction keeps a single
 function.
 
+What it does:
+
+- Builds the target with `--cuda-device-only -emit-llvm` so the output object is
+  LLVM bitcode rather than an ELF.
+- Converts the bitcode object to textual LLVM IR via `llvm-dis`.
+- Optionally extracts a single kernel to a smaller `.ll` with `llvm-extract`.
+
+How to use the resulting `.ll`:
+
+- Feed it to `llc` for codegen/regalloc repros (set `-mtriple`/`-mcpu` to match
+  the target).
+- Prefer the single-kernel `.ll` for reduction and faster iteration.
+
 Examples:
 
 ```
 ./tools/spill_fuzz/pele_hip_to_ll.sh -t pelec_repro2_dodecane_lu
 ./tools/spill_fuzz/pele_hip_to_ll.sh -t pelec_repro2_dodecane_lu -k my_kernel
+```
+
+Devcontainer one-liner:
+
+```
+devcontainer exec --workspace-folder . -- bash -lc "./tools/spill_fuzz/pele_hip_to_ll.sh -t pelec_repro2_dodecane_lu"
 ```
 
 You can override the ROCm prefix (default `/opt/rocm`) with `--rocm`.
