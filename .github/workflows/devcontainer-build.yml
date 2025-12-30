@@ -31,4 +31,4 @@ jobs:
           configFile: .devcontainer/devcontainer.json
           imageName: ghcr.io/${{ steps.vars.outputs.repo_lc }}/linux-amd64-rocm-fuzzer
           imageTag: ${{ github.sha }}
-          push: true
+          push: filter
