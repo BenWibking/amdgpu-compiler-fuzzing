@@ -20,6 +20,12 @@ RUN if ! zypper repos -E | grep devel_languages_perl; then \
         hip-devel \
         rocm-device-libs \
         rocm-hip-runtime && \
+    (zypper --non-interactive install --no-recommends rocThrust || \
+     zypper --non-interactive install --no-recommends rocthrust) && \
+    (zypper --non-interactive install --no-recommends rocPRIM || \
+     zypper --non-interactive install --no-recommends rocprim) && \
+    (zypper --non-interactive install --no-recommends hipCUB || \
+     zypper --non-interactive install --no-recommends hipcub) && \
     zypper clean --all && \
     cat rocm_so.conf >> /etc/ld.so.conf.d/rocm.conf && \
     rm rocm_so.conf && \
