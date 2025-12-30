@@ -11,8 +11,8 @@ ROCm tooling for GPU execution. The steps below outline a typical setup.
 Example:
 
 ```
-mkdir -p llvm-project/build
-cd llvm-project/build
+mkdir -p extern/llvm-project/build
+cd extern/llvm-project/build
 cmake -G Ninja ../llvm \
   -DLLVM_ENABLE_PROJECTS=clang \
   -DLLVM_TARGETS_TO_BUILD=AMDGPU \
@@ -23,7 +23,7 @@ ninja llc
 Set `LLC` if `llc` is not on your `PATH`:
 
 ```
-export LLC=/path/to/llvm-project/build/bin/llc
+export LLC=/path/to/extern/llvm-project/build/bin/llc
 ```
 
 ## Optional: ROCm + HIP runner

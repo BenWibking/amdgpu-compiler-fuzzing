@@ -25,8 +25,8 @@ You can run the tooling inside the devcontainer with the devcontainer CLI:
 ```sh
 devcontainer up --workspace-folder .
 devcontainer exec --workspace-folder . -- ./tools/spill_fuzz/spill_fuzz.py \
-  --corpus llvm-project/llvm/test/CodeGen/AMDGPU \
-  --llc llvm-project/build/bin/llc \
+  --corpus extern/llvm-project/llvm/test/CodeGen/AMDGPU \
+  --llc extern/llvm-project/build/bin/llc \
   --mcpu gfx90a \
   --passes greedy \
   --iterations 50

@@ -8,8 +8,8 @@ optional `-verify-machineinstrs`.
 
 ```
 ./tools/spill_fuzz/spill_fuzz.py \
-  --corpus llvm-project/llvm/test/CodeGen/AMDGPU \
-  --llc llvm-project/build/bin/llc \
+  --corpus extern/llvm-project/llvm/test/CodeGen/AMDGPU \
+  --llc extern/llvm-project/build/bin/llc \
   --mcpu gfx90a \
   --passes greedy \
   --verify-machineinstrs \
@@ -37,8 +37,8 @@ on failure:
 
 ```
 ./tools/spill_fuzz/spill_fuzz.py \
-  --corpus llvm-project/llvm/test/CodeGen/AMDGPU \
-  --llc llvm-project/build/bin/llc \
+  --corpus extern/llvm-project/llvm/test/CodeGen/AMDGPU \
+  --llc extern/llvm-project/build/bin/llc \
   --mcpu gfx90a \
   --gpu-cmd "./tools/spill_fuzz/run_on_gpu.sh"
 ```
