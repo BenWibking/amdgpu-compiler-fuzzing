@@ -17,6 +17,7 @@ RUN if ! zypper repos -E | grep devel_languages_perl; then \
     zypper --non-interactive --gpg-auto-import-keys refresh && \
     zypper --non-interactive install --no-recommends \
         hipcc \
+        hip-devel \
         rocm-device-libs \
         rocm-hip-runtime && \
     zypper clean --all && \

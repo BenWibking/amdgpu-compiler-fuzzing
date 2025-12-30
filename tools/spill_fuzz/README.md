@@ -90,6 +90,22 @@ SPILL_FUZZ_GPU_STRICT=1
 HIPCC=/opt/rocm/bin/hipcc
 ```
 
+## HIP kernel to LLVM IR helper
+
+The `tools/spill_fuzz/pele_hip_to_ll.sh` wrapper builds a HIP reproducer using
+`kernels/pele/Makefile`, emits device-only LLVM bitcode, and writes a `.ll`
+next to the kernel source. Optional `--kernel` extraction keeps a single
+function.
+
+Examples:
+
+```
+./tools/spill_fuzz/pele_hip_to_ll.sh -t pelec_repro2_dodecane_lu
+./tools/spill_fuzz/pele_hip_to_ll.sh -t pelec_repro2_dodecane_lu -k my_kernel
+```
+
+You can override the ROCm prefix (default `/opt/rocm`) with `--rocm`.
+
 ## Notes
 
 - This is a configuration fuzzer, not a structural MIR mutator yet.
