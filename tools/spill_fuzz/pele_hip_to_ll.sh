@@ -79,13 +79,39 @@ kernels_dir="kernels/pele"
 obj_path="${kernels_dir}/${target}.o"
 ll_path="${kernels_dir}/${target}.ll"
 
-llvm_dis="${ROCM_PATH}/llvm/bin/llvm-dis"
-llvm_extract="${ROCM_PATH}/llvm/bin/llvm-extract"
+llvm_dis_candidates=(
+  "${ROCM_PATH}/lib/llvm/bin/llvm-dis"
+  "${ROCM_PATH}/llvm/bin/llvm-dis"
+  "llvm-dis"
+)
+llvm_extract_candidates=(
+  "${ROCM_PATH}/lib/llvm/bin/llvm-extract"
+  "${ROCM_PATH}/llvm/bin/llvm-extract"
+  "llvm-extract"
+)
 
-if [[ ! -x "${llvm_dis}" ]]; then
-  llvm_dis="llvm-dis"
+llvm_dis=""
+for candidate in "${llvm_dis_candidates[@]}"; do
+  if [[ -x "${candidate}" ]]; then
+    llvm_dis="${candidate}"
+    break
+  fi
+done
+
+llvm_extract=""
+for candidate in "${llvm_extract_candidates[@]}"; do
+  if [[ -x "${candidate}" ]]; then
+    llvm_extract="${candidate}"
+    break
+  fi
+done
+
+if [[ -z "${llvm_dis}" ]]; then
+  echo "Could not find llvm-dis. Install LLVM or point --rocm to a full ROCm." >&2
+  exit 1
 fi
-if [[ ! -x "${llvm_extract}" ]]; then
+
+if [[ -z "${llvm_extract}" ]]; then
   llvm_extract="llvm-extract"
 fi
 

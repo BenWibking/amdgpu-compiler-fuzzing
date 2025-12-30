@@ -18,9 +18,10 @@ RUN if ! zypper repos -E | grep devel_languages_perl; then \
     zypper --non-interactive install --no-recommends \
         hipcc \
         hip-devel \
-        llvm \
         rocm-device-libs \
         rocm-hip-runtime && \
+    (zypper --non-interactive install --no-recommends llvm-amdgpu || \
+     zypper --non-interactive install --no-recommends rocm-llvm) && \
     (zypper --non-interactive install --no-recommends rocThrust || \
      zypper --non-interactive install --no-recommends rocthrust) && \
     (zypper --non-interactive install --no-recommends rocPRIM || \
