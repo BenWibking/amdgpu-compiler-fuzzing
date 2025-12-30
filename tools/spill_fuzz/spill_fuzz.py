@@ -315,6 +315,21 @@ def build_llc_cmd(cfg: FuzzConfig, mir_path: Path) -> List[str]:
     return cmd
 
 
+def build_verifier_cmd(cfg: FuzzConfig, mir_path: Path) -> List[str]:
+    cmd = [
+        cfg.llc,
+        f"-mtriple=amdgcn-amd-amdhsa",
+        f"-mcpu={cfg.mcpu}",
+        "-run-pass=machineverifier",
+        "-o",
+        "-",
+        str(mir_path),
+    ]
+    if cfg.spill_sgpr_to_vgpr is not None:
+        cmd.append(f"-amdgpu-spill-sgpr-to-vgpr={'1' if cfg.spill_sgpr_to_vgpr else '0'}")
+    return cmd
+
+
 def run_iteration(rng: random.Random, inputs: List[Path], out_dir: Path, args: argparse.Namespace) -> int:
     input_path = rng.choice(inputs)
     num_vgpr, num_sgpr = choose_limits(rng, args.min_vgpr, args.max_vgpr,
@@ -341,6 +356,12 @@ def run_iteration(rng: random.Random, inputs: List[Path], out_dir: Path, args: a
     out_dir.mkdir(parents=True, exist_ok=True)
     tmp_path = out_dir / f"{input_path.stem}.vgpr{num_vgpr}.sgpr{num_sgpr}.mir"
     tmp_path.write_text(mutated_text, encoding="utf-8")
+
+    verify_cmd = build_verifier_cmd(cfg, tmp_path)
+    vcode, _, vstderr = run_cmd(verify_cmd)
+    if vcode != 0:
+        sys.stderr.write(f"MIR failed machine verifier before passes: {verify_cmd}\n{vstderr}\n")
+        return 1
 
     cmd = build_llc_cmd(cfg, tmp_path)
     code, stdout, stderr = run_cmd(cmd)

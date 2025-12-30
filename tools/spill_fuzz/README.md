@@ -20,6 +20,7 @@ optional `-verify-machineinstrs`.
 
 - Picks a random `.mir` file from the corpus.
 - Injects `"amdgpu-num-vgpr"`/`"amdgpu-num-sgpr"` into the IR section.
+- Verifies the MIR with `llc -run-pass=machineverifier` before running passes.
 - Runs `llc -run-pass=<passes>` and captures MIR output.
 - Runs a spill-dominance oracle on `SI_SPILL_*_SAVE/RESTORE` pairs.
 - Optionally calls a GPU runner.
@@ -27,6 +28,7 @@ optional `-verify-machineinstrs`.
 ## Non-GPU oracles
 
 - `-verify-machineinstrs` from `llc` (use `--verify-machineinstrs`).
+- Pre-pass machine verifier (`-run-pass=machineverifier`) to catch invalid MIR.
 - Spill-dominance check (always on). It ensures each restore of `%stack.N` has
   a dominating save of the same slot.
 
