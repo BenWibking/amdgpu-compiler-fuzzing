@@ -1,7 +1,9 @@
 // devcontainer.json
     {
       "name": "ROCm Dev Container",
-      "image": "linux-amd64-rocm-fuzzer:main",
+      "build": {
+        "dockerfile": "Dockerfile"
+      },
       "hostRequirements": {
         "cpus": 4
       },
