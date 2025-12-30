@@ -15,7 +15,7 @@ RUN if ! zypper repos -E | grep devel_languages_perl; then \
     echo "gpgcheck=1" | tee --append /etc/zypp/repos.d/rocm.repo && \
     echo "gpgkey=https://repo.radeon.com/rocm/rocm.gpg.key" | tee --append /etc/zypp/repos.d/rocm.repo && \
     zypper --non-interactive --gpg-auto-import-keys refresh && \
-    zypper --non-interactive --no-recommends install \
+    zypper --non-interactive install --no-recommends \
         hipcc \
         rocm-device-libs \
         rocm-hip-runtime && \
@@ -35,7 +35,7 @@ ENV CC=amdclang
 ENV CXX=amdclang++
 
 # add packages for C++ builds and basic GNU tools
-RUN zypper --non-interactive --no-recommends install \
+RUN zypper --non-interactive install --no-recommends \
     wget tar gzip file gcc gcc-c++ make cmake patch \
     which coreutils findutils grep gawk sed ripgrep \
     git python3 && \
