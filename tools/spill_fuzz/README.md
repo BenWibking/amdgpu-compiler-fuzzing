@@ -18,17 +18,34 @@ optional `-verify-machineinstrs`.
 
 ## What it does
 
-- Picks a random `.mir` file from the corpus.
-- Injects `"amdgpu-num-vgpr"`/`"amdgpu-num-sgpr"` into the IR section.
-- Verifies the MIR with `llc -run-pass=machineverifier` before running passes.
-- Runs `llc -run-pass=<passes>` and captures MIR output.
+- Picks a random `.ll` file from the corpus and lowers it to MIR with the
+  selected `llc` to keep formats in sync.
+- Skips IR that targets non-HSA shader calling conventions.
+- Skips IR that uses WMMA intrinsics unless `--mcpu` is gfx11/gfx12.
+- Skips IR that uses OpenCL `printf` intrinsics.
+- Skips IR that uses r600 or legacy FMA intrinsics.
+- Skips IR containing `CODE_OBJECT_VERSION` metadata tokens.
+- Skips IR with dynamic alloca.
+- Skips IR that uses SMFMAC intrinsics unless `--mcpu` is gfx95.
+- Skips IR that defines LDS/GDS globals when non-kernel functions are present.
+- Skips IR that uses MFMA intrinsics unless `--mcpu` is gfx90/gfx94/gfx95.
+- Skips IR that contains "invalid addrspacecast" diagnostics.
+- Skips IR that uses `amdgpu_gfx` calling convention.
+- Skips IR that uses `llvm.amdgcn.fdot2.*` unless `--mcpu` is gfx94/gfx95.
+- Skips workgroup attribute error-check tests.
+- Skips invalid `read_register` tests.
+- Skips atomic fmax intrinsics unless `--mcpu` is gfx10/gfx11/gfx94/gfx95.
+- Injects `"amdgpu-num-vgpr"`/`"amdgpu-num-sgpr"` into the IR.
+- Verifies machine state after ISel with `llc -stop-after=finalize-isel`.
+- Runs `llc -stop-after=<passes> -print-after=<passes>` and captures the machine
+  dump for the spill-dominance oracle.
 - Runs a spill-dominance oracle on `SI_SPILL_*_SAVE/RESTORE` pairs.
 - Optionally calls a GPU runner.
 
 ## Non-GPU oracles
 
 - `-verify-machineinstrs` from `llc` (use `--verify-machineinstrs`).
-- Pre-pass machine verifier (`-run-pass=machineverifier`) to catch invalid MIR.
+- Pre-pass machine verifier (`-stop-after=finalize-isel`) to catch invalid inputs.
 - Spill-dominance check (always on). It ensures each restore of `%stack.N` has
   a dominating save of the same slot.
 
