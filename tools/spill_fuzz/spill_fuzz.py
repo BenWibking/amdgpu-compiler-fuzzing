@@ -7,13 +7,14 @@ spill-dominance check). It can optionally hand off to a GPU runner.
 """
 
 import argparse
+import glob
 import os
 import random
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -27,24 +28,34 @@ SUCCESSOR_BB_RE = re.compile(r"%bb\.([A-Za-z0-9_\.]+)")
 FUNC_NAME_RE = re.compile(r"^name:\s*(\S+)")
 
 
-@dataclass
 class FuzzConfig:
-    llc: str
-    mcpu: str
-    passes: str
-    verify_machine_instrs: bool
-    num_vgpr: int
-    num_sgpr: int
-    spill_sgpr_to_vgpr: Optional[bool]
-    gpu_cmd: Optional[str]
+    def __init__(
+        self,
+        llc: str,
+        mcpu: str,
+        passes: str,
+        verify_machine_instrs: bool,
+        num_vgpr: int,
+        num_sgpr: int,
+        spill_sgpr_to_vgpr: Optional[bool],
+        gpu_cmd: Optional[str],
+    ) -> None:
+        self.llc = llc
+        self.mcpu = mcpu
+        self.passes = passes
+        self.verify_machine_instrs = verify_machine_instrs
+        self.num_vgpr = num_vgpr
+        self.num_sgpr = num_sgpr
+        self.spill_sgpr_to_vgpr = spill_sgpr_to_vgpr
+        self.gpu_cmd = gpu_cmd
 
 
-@dataclass
 class SpillIssue:
-    function: str
-    block: str
-    slot: str
-    reason: str
+    def __init__(self, function: str, block: str, slot: str, reason: str) -> None:
+        self.function = function
+        self.block = block
+        self.slot = slot
+        self.reason = reason
 
 
 class MirFunction:
@@ -97,9 +108,35 @@ def run_cmd(cmd: List[str], cwd: Optional[Path] = None) -> Tuple[int, str, str]:
         cwd=str(cwd) if cwd else None,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True,
+        universal_newlines=True,
     )
     return proc.returncode, proc.stdout, proc.stderr
+
+
+def resolve_llc(llc_arg: str) -> str:
+    if os.path.isfile(llc_arg) and os.access(llc_arg, os.X_OK):
+        return llc_arg
+    if os.sep in llc_arg:
+        candidates = [
+            "/opt/rocm/lib/llvm/bin/llc",
+        ]
+        candidates.extend(sorted(glob.glob("/opt/rocm-*/lib/llvm/bin/llc")))
+        candidates.extend(sorted(glob.glob("/opt/rocm-*/llvm/bin/llc")))
+        for candidate in candidates:
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                sys.stderr.write(f"llc not found at {llc_arg}; using {candidate}\n")
+                return candidate
+        fallback = shutil.which("llc")
+        if fallback:
+            sys.stderr.write(f"llc not found at {llc_arg}; using {fallback}\n")
+            return fallback
+        return llc_arg
+    resolved = shutil.which(llc_arg)
+    if resolved:
+        if resolved != llc_arg:
+            sys.stderr.write(f"using llc from PATH: {resolved}\n")
+        return resolved
+    return llc_arg
 
 
 def apply_reg_limits_to_ir(ir_text: str, num_vgpr: int, num_sgpr: int) -> str:
@@ -330,6 +367,7 @@ def run_iteration(rng: random.Random, inputs: List[Path], out_dir: Path, args: a
 
 def main() -> int:
     args = parse_args()
+    args.llc = resolve_llc(args.llc)
     corpus_dir = Path(args.corpus)
     inputs = collect_inputs(corpus_dir)
     if not inputs:
