@@ -1,4 +1,4 @@
-# AMDGPU Compiler Fuzzing
+# [WIP] AMDGPU Compiler Fuzzer
 
 This repository contains tooling and notes for fuzzing the AMDGPU
 compiler toolchain.
