@@ -138,6 +138,35 @@ Example `llc` invocation:
   kernels/pele/pelec_repro2_dodecane_lu.ll -o /tmp/pele.s
 ```
 
+Extract each kernel into its own `.ll` (no `llvm-extract` required):
+
+```
+./tools/spill_fuzz/extract_amdgpu_kernels.sh \
+  kernels/pele/pelec_repro2_dodecane_lu.ll
+```
+
+This writes `kernel-<kernel_name>.ll` files in the same directory (non-filename
+characters are replaced with `_`).
+
+List available kernels without extracting:
+
+```
+./tools/spill_fuzz/extract_amdgpu_kernels.sh --list \
+  kernels/pele/pelec_repro2_dodecane_lu.ll
+```
+
+Demangle kernel names (also used for output filenames when extracting):
+
+```
+./tools/spill_fuzz/extract_amdgpu_kernels.sh --demangle \
+  kernels/pele/pelec_repro2_dodecane_lu.ll
+```
+
+When `--demangle` is used, the script writes a `kernel-map.txt` file that maps
+mangled names to demangled names and output paths. The output filenames use the
+demangled base name (without parameter lists). Collisions get a hash suffix, and
+long names are truncated with a hash to avoid filename length limits.
+
 You can override the ROCm prefix (default `/opt/rocm`) with `--rocm`.
 
 ## Notes

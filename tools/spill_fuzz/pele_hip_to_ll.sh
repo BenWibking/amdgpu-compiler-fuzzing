@@ -26,6 +26,11 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     -k|--kernel)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --kernel" >&2
+        usage >&2
+        exit 1
+      fi
       kernel="$2"
       shift 2
       ;;
