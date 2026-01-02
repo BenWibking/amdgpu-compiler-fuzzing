@@ -1,7 +1,7 @@
 # Installation
 
-This project relies on a local LLVM build with the AMDGPU backend, plus optional
-ROCm tooling for GPU execution. The steps below outline a typical setup.
+This project relies on a local LLVM build with the AMDGPU backend, plus ROCm
+tooling for GPU execution. The steps below outline a typical setup.
 
 ## Build LLVM with AMDGPU
 
@@ -26,7 +26,7 @@ Set `LLC` if `llc` is not on your `PATH`:
 export LLC=/path/to/extern/llvm-project/build/bin/llc
 ```
 
-## Optional: ROCm + HIP runner
+## ROCm + HIP runner (required)
 
 The GPU oracle uses HIP to compile and run a kernel. Install ROCm and ensure
 `hipcc` is available on your `PATH`. You can also override it with `HIPCC`.

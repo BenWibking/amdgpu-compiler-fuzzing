@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""AMDGPU spill fuzzing harness with non-GPU oracles.
+"""AMDGPU spill fuzzing harness with a GPU oracle.
 
 This is a configuration fuzzer: it varies register limits and pass settings
-against a MIR corpus, then applies static oracles (machine verifier and a
-spill-dominance check). It can optionally hand off to a GPU runner.
+against a MIR corpus, then relies on a GPU runner to detect issues.
 """
 
 import argparse
@@ -11,22 +10,13 @@ import glob
 import os
 import random
 import re
+import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
-
-
-SPILL_SAVE_RE = re.compile(r"\bSI_SPILL_\w+_SAVE\b")
-SPILL_RESTORE_RE = re.compile(r"\bSI_SPILL_\w+_RESTORE\b")
-STACK_SLOT_RE = re.compile(r"%stack\.(\d+)")
-BB_RE = re.compile(r"^\s*(?:\d+B\s+)?bb\.([A-Za-z0-9_\.]+).*:")
-SUCCESSORS_RE = re.compile(r"\bsuccessors:\s*(.*)$")
-SUCCESSOR_BB_RE = re.compile(r"%bb\.([A-Za-z0-9_\.]+)")
-FUNC_NAME_RE = re.compile(r"^name:\s*(\S+)")
-MACHINE_FUNC_RE = re.compile(r"^#?\s*Machine code for function (\S+):")
+from typing import List, Optional, Tuple
 NON_HSA_SHADER_CC_RE = re.compile(r"\bamdgpu_(ps|vs|gs|hs|es|ls|cs)\b")
 NON_HSA_SHADER_ATTR_RE = re.compile(r'"amdgpu-shader-type"\s*=\s*"\w+"')
 NON_HSA_FUNC_RE = re.compile(r"\bamdgpu_cs_chain_func\b")
@@ -59,7 +49,7 @@ class FuzzConfig:
         num_vgpr: int,
         num_sgpr: int,
         spill_sgpr_to_vgpr: Optional[bool],
-        gpu_cmd: Optional[str],
+        gpu_cmd: List[str],
     ) -> None:
         self.llc = llc
         self.mcpu = mcpu
@@ -69,38 +59,6 @@ class FuzzConfig:
         self.num_sgpr = num_sgpr
         self.spill_sgpr_to_vgpr = spill_sgpr_to_vgpr
         self.gpu_cmd = gpu_cmd
-
-
-class SpillIssue:
-    def __init__(self, function: str, block: str, slot: str, reason: str) -> None:
-        self.function = function
-        self.block = block
-        self.slot = slot
-        self.reason = reason
-
-
-class MirFunction:
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.blocks: List[str] = []
-        self.succs: Dict[str, List[str]] = {}
-        self.instrs: Dict[str, List[str]] = {}
-
-    def add_block(self, bb: str) -> None:
-        if bb not in self.instrs:
-            self.blocks.append(bb)
-            self.instrs[bb] = []
-            self.succs.setdefault(bb, [])
-
-    def add_instr(self, bb: str, instr: str) -> None:
-        self.instrs.setdefault(bb, []).append(instr)
-
-    def add_succs(self, bb: str, succs: List[str]) -> None:
-        self.succs[bb] = succs
-
-
-def normalize_bb_id(bb_id: str) -> str:
-    return bb_id.split(".", 1)[0]
 
 
 def parse_args() -> argparse.Namespace:
@@ -117,7 +75,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-sgpr", type=int, default=128)
     parser.add_argument("--verify-machineinstrs", action="store_true")
     parser.add_argument("--spill-sgpr-to-vgpr", choices=["on", "off"], default="on")
-    parser.add_argument("--gpu-cmd", default=None,
+    parser.add_argument("--gpu-cmd", required=True,
                         help="Command to run a GPU oracle. It receives the MIR path.")
     parser.add_argument("--out-dir", default="spill_fuzz_out")
     return parser.parse_args()
@@ -162,6 +120,20 @@ def resolve_llc(llc_arg: str) -> str:
             sys.stderr.write(f"using llc from PATH: {resolved}\n")
         return resolved
     return llc_arg
+
+
+def resolve_gpu_cmd(gpu_cmd: str) -> List[str]:
+    argv = shlex.split(gpu_cmd)
+    if not argv:
+        raise ValueError("GPU oracle command is empty")
+    exe = argv[0]
+    if os.path.isfile(exe) and os.access(exe, os.X_OK):
+        return argv
+    resolved = shutil.which(exe)
+    if resolved is None:
+        raise ValueError(f"GPU oracle command not found or not executable: {exe}")
+    argv[0] = resolved
+    return argv
 
 
 def apply_reg_limits_to_ir(ir_text: str, num_vgpr: int, num_sgpr: int) -> str:
@@ -299,130 +271,6 @@ def rewrite_mir_with_limits(mir_text: str, num_vgpr: int, num_sgpr: int) -> str:
     return pre + "--- |" + ir + "..." + post
 
 
-def parse_mir_functions(mir_text: str) -> List[MirFunction]:
-    functions: List[MirFunction] = []
-    current_func: Optional[MirFunction] = None
-    in_body = False
-    current_bb: Optional[str] = None
-
-    for raw_line in mir_text.splitlines():
-        line = raw_line.rstrip("\n")
-        stripped_line = line.strip()
-        name_match = FUNC_NAME_RE.match(stripped_line)
-        if not name_match:
-            name_match = MACHINE_FUNC_RE.match(stripped_line)
-        if name_match:
-            current_func = MirFunction(name_match.group(1))
-            functions.append(current_func)
-            in_body = name_match.re is MACHINE_FUNC_RE
-            current_bb = None
-            continue
-
-        if stripped_line.startswith("body:"):
-            in_body = True
-            continue
-
-        if not in_body or current_func is None:
-            continue
-
-        bb_match = BB_RE.match(line)
-        if bb_match:
-            current_bb = f"bb.{normalize_bb_id(bb_match.group(1))}"
-            current_func.add_block(current_bb)
-            continue
-
-        if current_bb is None:
-            continue
-
-        succ_match = SUCCESSORS_RE.search(line)
-        if succ_match:
-            succs = SUCCESSOR_BB_RE.findall(succ_match.group(1))
-            succ_blocks = [f"bb.{normalize_bb_id(s)}" for s in succs]
-            current_func.add_succs(current_bb, succ_blocks)
-            continue
-
-        stripped = line.strip()
-        if not stripped or stripped.startswith(";") or stripped.startswith("#"):
-            continue
-
-        # Skip metadata-like lines that are not instructions.
-        if stripped.startswith("liveins:"):
-            continue
-
-        current_func.add_instr(current_bb, stripped)
-
-    return functions
-
-
-def compute_dominators(func: MirFunction) -> Dict[str, Set[str]]:
-    if not func.blocks:
-        return {}
-    preds: Dict[str, List[str]] = {b: [] for b in func.blocks}
-    for b in func.blocks:
-        for succ in func.succs.get(b, []):
-            preds.setdefault(succ, []).append(b)
-
-    entry = func.blocks[0]
-    dom: Dict[str, Set[str]] = {b: set(func.blocks) for b in func.blocks}
-    dom[entry] = {entry}
-
-    changed = True
-    while changed:
-        changed = False
-        for b in func.blocks:
-            if b == entry:
-                continue
-            pred_sets = [dom[p] for p in preds.get(b, []) if p in dom]
-            if pred_sets:
-                new_dom = set.intersection(*pred_sets)
-            else:
-                new_dom = set()
-            new_dom.add(b)
-            if new_dom != dom[b]:
-                dom[b] = new_dom
-                changed = True
-
-    return dom
-
-
-def check_spill_dominance(mir_text: str) -> List[SpillIssue]:
-    if "Machine code for function" not in mir_text and "name:" not in mir_text:
-        return []
-    issues: List[SpillIssue] = []
-    for func in parse_mir_functions(mir_text):
-        dom = compute_dominators(func)
-        slot_saves: Dict[str, Dict[str, List[int]]] = {}
-        slot_restore_sites: List[Tuple[str, str, int]] = []
-
-        for bb in func.blocks:
-            instrs = func.instrs.get(bb, [])
-            for idx, instr in enumerate(instrs):
-                slot_match = STACK_SLOT_RE.search(instr)
-                if not slot_match:
-                    continue
-                slot = slot_match.group(1)
-                if SPILL_SAVE_RE.search(instr):
-                    slot_saves.setdefault(slot, {}).setdefault(bb, []).append(idx)
-                elif SPILL_RESTORE_RE.search(instr):
-                    slot_restore_sites.append((slot, bb, idx))
-
-        for slot, bb, idx in slot_restore_sites:
-            saves_in_bb = slot_saves.get(slot, {}).get(bb, [])
-            if any(s < idx for s in saves_in_bb):
-                continue
-            dominating_blocks = [b for b in slot_saves.get(slot, {}) if b in dom.get(bb, set())]
-            if not dominating_blocks:
-                issues.append(
-                    SpillIssue(
-                        function=func.name,
-                        block=bb,
-                        slot=slot,
-                        reason="restore not dominated by spill save",
-                    )
-                )
-    return issues
-
-
 def choose_limits(rng: random.Random, min_vgpr: int, max_vgpr: int,
                   min_sgpr: int, max_sgpr: int) -> Tuple[int, int]:
     num_vgpr = rng.randint(min_vgpr, max_vgpr)
@@ -439,8 +287,7 @@ def resolve_pass_name(passes: str) -> str:
     return pass_list[0]
 
 
-def build_llc_cmd(cfg: FuzzConfig, ir_path: Path) -> List[str]:
-    pass_name = resolve_pass_name(cfg.passes)
+def build_llc_cmd_for_pass(cfg: FuzzConfig, ir_path: Path, pass_name: str) -> List[str]:
     cmd = [
         cfg.llc,
         f"-mtriple=amdgcn-amd-amdhsa",
@@ -456,6 +303,11 @@ def build_llc_cmd(cfg: FuzzConfig, ir_path: Path) -> List[str]:
     if cfg.spill_sgpr_to_vgpr is not None:
         cmd.append(f"-amdgpu-spill-sgpr-to-vgpr={'1' if cfg.spill_sgpr_to_vgpr else '0'}")
     return cmd
+
+
+def build_llc_cmd(cfg: FuzzConfig, ir_path: Path) -> List[str]:
+    pass_name = resolve_pass_name(cfg.passes)
+    return build_llc_cmd_for_pass(cfg, ir_path, pass_name)
 
 
 def build_pre_ra_verifier_cmd(cfg: FuzzConfig, ir_path: Path) -> List[str]:
@@ -560,25 +412,16 @@ def run_iteration(rng: random.Random, inputs: List[Path], out_dir: Path, args: a
         return 1
 
     cmd = build_llc_cmd(cfg, tmp_path)
-    code, stdout, stderr = run_cmd(cmd)
+    code, _, stderr = run_cmd(cmd)
     if code != 0:
         sys.stderr.write(f"llc failed: {cmd}\n{stderr}\n")
         return 1
 
-    dump_text = stderr if stderr else stdout
-    issues = check_spill_dominance(dump_text)
-    if issues:
-        sys.stderr.write("Spill dominance issues:\n")
-        for issue in issues:
-            sys.stderr.write(f"  {issue.function} {issue.block} %stack.{issue.slot}: {issue.reason}\n")
+    gpu_cmd = cfg.gpu_cmd + [str(tmp_path)]
+    gcode, _, gerr = run_cmd(gpu_cmd)
+    if gcode != 0:
+        sys.stderr.write(f"GPU runner failed: {gpu_cmd}\n{gerr}\n")
         return 1
-
-    if cfg.gpu_cmd:
-        gpu_cmd = cfg.gpu_cmd.split() + [str(tmp_path)]
-        gcode, _, gerr = run_cmd(gpu_cmd)
-        if gcode != 0:
-            sys.stderr.write(f"GPU runner failed: {gpu_cmd}\n{gerr}\n")
-            return 1
 
     return 0
 
@@ -586,6 +429,11 @@ def run_iteration(rng: random.Random, inputs: List[Path], out_dir: Path, args: a
 def main() -> int:
     args = parse_args()
     args.llc = resolve_llc(args.llc)
+    try:
+        args.gpu_cmd = resolve_gpu_cmd(args.gpu_cmd)
+    except ValueError as exc:
+        sys.stderr.write(f"{exc}\n")
+        return 2
     corpus_dir = Path(args.corpus)
     inputs = collect_inputs(corpus_dir)
     if not inputs:

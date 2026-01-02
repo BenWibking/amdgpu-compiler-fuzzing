@@ -17,18 +17,19 @@ For deeper details, see `tools/spill_fuzz/README.md`.
   --mcpu gfx90a \
   --passes greedy \
   --verify-machineinstrs \
+  --gpu-cmd "./tools/spill_fuzz/run_on_gpu.sh" \
   --iterations 50
 ```
 
 ## What you get
 
 - The fuzzer mutates register limits and pass settings in a random `.mir` file.
-- It runs `llc` with the requested passes and checks spill-dominance.
+- It runs `llc` with the requested passes and invokes the GPU oracle.
 - Failures and minimized outputs are written under `spill_fuzz_out/` by default.
 
-## Optional GPU oracle (HIP)
+## GPU oracle (HIP)
 
-You can also compare GPU execution between a high-register baseline and the
+The fuzzer compares GPU execution between a high-register baseline and the
 current fuzzed variant:
 
 ```
