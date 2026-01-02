@@ -101,7 +101,8 @@ What it does:
 
 - Builds the target with `--cuda-device-only -emit-llvm` so the output object is
   LLVM bitcode rather than an ELF.
-- Converts the bitcode object to textual LLVM IR via `llvm-dis`.
+- Converts the bitcode object to textual LLVM IR via `llvm-dis` (or `opt -S` if
+  `llvm-dis` is unavailable).
 - Optionally extracts a single kernel to a smaller `.ll` with `llvm-extract`.
 
 How to use the resulting `.ll`:
@@ -121,6 +122,20 @@ Devcontainer one-liner:
 
 ```
 devcontainer exec --workspace-folder . -- bash -lc "./tools/spill_fuzz/pele_hip_to_ll.sh -t pelec_repro2_dodecane_lu"
+```
+
+Output:
+
+- `kernels/pele/pelec_repro2_dodecane_lu.ll` is device IR for `llc`.
+- `kernels/pele/pelec_repro2_dodecane_lu.<kernel>.ll` is produced when using
+  `--kernel`.
+
+Example `llc` invocation:
+
+```
+/opt/rocm-6.4.4/lib/llvm/bin/llc \
+  -mtriple=amdgcn-amd-amdhsa -mcpu=gfx942 -O3 \
+  kernels/pele/pelec_repro2_dodecane_lu.ll -o /tmp/pele.s
 ```
 
 You can override the ROCm prefix (default `/opt/rocm`) with `--rocm`.

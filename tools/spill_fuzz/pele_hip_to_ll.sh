@@ -86,6 +86,13 @@ llvm_dis_candidates=(
   /opt/rocm-*/llvm/bin/llvm-dis
   "llvm-dis"
 )
+opt_candidates=(
+  "${ROCM_PATH}/lib/llvm/bin/opt"
+  "${ROCM_PATH}/llvm/bin/opt"
+  /opt/rocm-*/lib/llvm/bin/opt
+  /opt/rocm-*/llvm/bin/opt
+  "opt"
+)
 llvm_extract_candidates=(
   "${ROCM_PATH}/lib/llvm/bin/llvm-extract"
   "${ROCM_PATH}/llvm/bin/llvm-extract"
@@ -102,6 +109,14 @@ for candidate in "${llvm_dis_candidates[@]}"; do
   fi
 done
 
+opt_tool=""
+for candidate in "${opt_candidates[@]}"; do
+  if [[ -x "${candidate}" ]]; then
+    opt_tool="${candidate}"
+    break
+  fi
+done
+
 llvm_extract=""
 for candidate in "${llvm_extract_candidates[@]}"; do
   if [[ -x "${candidate}" ]]; then
@@ -110,8 +125,8 @@ for candidate in "${llvm_extract_candidates[@]}"; do
   fi
 done
 
-if [[ -z "${llvm_dis}" ]]; then
-  echo "Could not find llvm-dis. Install LLVM or point --rocm to a full ROCm." >&2
+if [[ -z "${llvm_dis}" && -z "${opt_tool}" ]]; then
+  echo "Could not find llvm-dis or opt. Install ROCm LLVM tools or update --rocm." >&2
   exit 1
 fi
 
@@ -122,11 +137,19 @@ fi
 make -C "${kernels_dir}" "${target}.o" \
   FLAGS="--cuda-device-only -emit-llvm"
 
-"${llvm_dis}" "${obj_path}" -o "${ll_path}"
+if [[ -n "${llvm_dis}" ]]; then
+  "${llvm_dis}" "${obj_path}" -o "${ll_path}"
+else
+  "${opt_tool}" -S -o "${ll_path}" "${obj_path}"
+fi
 
 echo "Wrote ${ll_path}"
 
 if [[ -n "${kernel}" ]]; then
+  if ! command -v "${llvm_extract}" >/dev/null 2>&1; then
+    echo "Could not find llvm-extract. Install ROCm LLVM tools to use --kernel." >&2
+    exit 1
+  fi
   out_kernel_ll="${kernels_dir}/${target}.${kernel}.ll"
   "${llvm_extract}" -func "${kernel}" "${ll_path}" -o "${out_kernel_ll}"
   echo "Wrote ${out_kernel_ll}"

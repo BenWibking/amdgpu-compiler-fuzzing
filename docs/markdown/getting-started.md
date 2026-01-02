@@ -45,3 +45,29 @@ also build it manually:
 ```
 ./tools/spill_fuzz/build_hip_runner.sh
 ```
+
+## Example: Pele kernel to LLVM IR
+
+The Pele reproducers under `kernels/pele/` can be lowered to device-only LLVM
+IR using the helper script:
+
+```
+./tools/spill_fuzz/pele_hip_to_ll.sh -t pelec_repro2_dodecane_lu
+```
+
+Devcontainer one-liner:
+
+```
+devcontainer exec --workspace-folder . -- bash -lc "./tools/spill_fuzz/pele_hip_to_ll.sh -t pelec_repro2_dodecane_lu"
+```
+
+This writes `kernels/pele/pelec_repro2_dodecane_lu.ll`, which you can feed to
+`llc` for regalloc/codegen repros.
+
+Example `llc` invocation:
+
+```
+/opt/rocm-6.4.4/lib/llvm/bin/llc \
+  -mtriple=amdgcn-amd-amdhsa -mcpu=gfx942 -O3 \
+  kernels/pele/pelec_repro2_dodecane_lu.ll -o /tmp/pele.s
+```
