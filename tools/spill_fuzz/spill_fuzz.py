@@ -99,6 +99,10 @@ class MirFunction:
         self.succs[bb] = succs
 
 
+def normalize_bb_id(bb_id: str) -> str:
+    return bb_id.split(".", 1)[0]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--corpus", required=True, help="Directory with .mir files")
@@ -323,7 +327,7 @@ def parse_mir_functions(mir_text: str) -> List[MirFunction]:
 
         bb_match = BB_RE.match(line)
         if bb_match:
-            current_bb = f"bb.{bb_match.group(1)}"
+            current_bb = f"bb.{normalize_bb_id(bb_match.group(1))}"
             current_func.add_block(current_bb)
             continue
 
@@ -333,7 +337,7 @@ def parse_mir_functions(mir_text: str) -> List[MirFunction]:
         succ_match = SUCCESSORS_RE.search(line)
         if succ_match:
             succs = SUCCESSOR_BB_RE.findall(succ_match.group(1))
-            succ_blocks = [f"bb.{s}" for s in succs]
+            succ_blocks = [f"bb.{normalize_bb_id(s)}" for s in succs]
             current_func.add_succs(current_bb, succ_blocks)
             continue
 

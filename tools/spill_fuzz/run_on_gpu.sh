@@ -1,9 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MIR_PATH=${1:-}
+MIR_PATH=""
+INPUT_SPEC_JSON=${SPILL_FUZZ_INPUT_SPEC:-}
+if [[ $# -gt 0 ]]; then
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --input-spec)
+        INPUT_SPEC_JSON=${2:-}
+        shift 2
+        ;;
+      -*)
+        echo "unknown option: $1" >&2
+        exit 2
+        ;;
+      *)
+        if [[ -n "${MIR_PATH}" ]]; then
+          echo "unexpected extra argument: $1" >&2
+          exit 2
+        fi
+        MIR_PATH=$1
+        shift
+        ;;
+    esac
+  done
+fi
 if [[ -z "${MIR_PATH}" ]]; then
-  echo "usage: $0 <file.mir>" >&2
+  echo "usage: $0 [--input-spec input.json] <file.mir>" >&2
   exit 2
 fi
 
@@ -35,6 +58,7 @@ TEST_OBJ="${WORK_DIR}/test.o"
 REF_HSACO="${WORK_DIR}/ref.hsaco"
 TEST_HSACO="${WORK_DIR}/test.hsaco"
 SPEC="${WORK_DIR}/kernel.spec"
+INPUT_SPEC="${WORK_DIR}/input.spec"
 
 python3 - <<'PY' "${MIR_PATH}" "${TEST_MIR}"
 import sys
@@ -116,8 +140,15 @@ if ! "${META_PARSER}" --llvm-readobj "${LLVM_READOBJ}" "${REF_HSACO}" --out "${S
   exit ${status}
 fi
 
+INPUT_SPEC_ARG=()
+if [[ -n "${INPUT_SPEC_JSON}" ]]; then
+  python3 "${TOOLS_DIR}/build_input_spec.py" --in "${INPUT_SPEC_JSON}" --out "${INPUT_SPEC}"
+  INPUT_SPEC_ARG=(--input-spec "${INPUT_SPEC}")
+fi
+
 "${HIP_RUNNER}" \
   --hsaco-a "${REF_HSACO}" \
   --hsaco-b "${TEST_HSACO}" \
   --spec "${SPEC}" \
-  --buffer-size "${BUFFER_SIZE}"
+  --buffer-size "${BUFFER_SIZE}" \
+  "${INPUT_SPEC_ARG[@]}"

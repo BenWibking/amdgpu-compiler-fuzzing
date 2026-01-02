@@ -87,8 +87,34 @@ SPILL_FUZZ_MCPU=gfx90a
 SPILL_FUZZ_BUFFER_SIZE=4096
 SPILL_FUZZ_KERNEL=my_kernel_name
 SPILL_FUZZ_GPU_STRICT=1
+SPILL_FUZZ_INPUT_SPEC=/path/to/input.json
 HIPCC=/opt/rocm/bin/hipcc
 ```
+
+Input spec (optional)
+
+The GPU runner can consume a JSON file to set deterministic argument values,
+buffer sizes, and launch dimensions. When set via `SPILL_FUZZ_INPUT_SPEC` or
+`--input-spec`, the JSON is converted into a flat spec and fed to `hip_runner`.
+
+Example JSON:
+
+```json
+{
+  "seed": 12345,
+  "launch": { "grid": [1, 1, 1], "block": [1, 1, 1] },
+  "buffers": { "10": { "size_bytes": 65536 } },
+  "values": {
+    "0": 0,
+    "5": { "int": 64 },
+    "73": { "bytes": [0, 0, 0, 0] }
+  }
+}
+```
+
+Notes:
+- `buffers`/`values` use argument indices from the kernel metadata order.
+- `values` supports integer, `hex`, or explicit `bytes` entries.
 
 ## HIP kernel to LLVM IR helper
 
@@ -188,6 +214,17 @@ cp kernels/pele/kernel-pc_cmpflx_launch*.ll /tmp/pele-fuzz/
   --mcpu gfx942 \
   --passes greedy \
   --iterations 1
+```
+
+Check spill-dominance on original vs mutated IR:
+
+```
+./tools/spill_fuzz/check_spill_dominance_repro.sh \
+  --llc /opt/rocm-6.4.4/lib/llvm/bin/llc \
+  --mcpu gfx942 \
+  --input kernels/pele/kernel-pc_cmpflx_launch-a7d5b88a0dde5efe7b96045874e05330cd93917d.ll \
+  --vgpr 20 \
+  --sgpr 108
 ```
 
 Devcontainer alias (optional):
