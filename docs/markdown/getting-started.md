@@ -89,7 +89,7 @@ List available kernels without extracting:
   kernels/pele/pelec_repro2_dodecane_lu.ll
 ```
 
-Demangle kernel names (also used for output filenames when extracting):
+Demangle kernel names (default; also used for output filenames when extracting):
 
 ```
 ./tools/spill_fuzz/extract_amdgpu_kernels.sh --demangle \
@@ -100,3 +100,32 @@ When `--demangle` is used, the script writes a `kernel-map.txt` file that maps
 mangled names to demangled names and output paths. The output filenames use the
 demangled base name (without parameter lists). Collisions get a hash suffix, and
 long names are truncated with a hash to avoid filename length limits.
+
+Strip debug info from extracted kernels:
+
+```
+./tools/spill_fuzz/extract_amdgpu_kernels.sh --strip-debug \
+  kernels/pele/pelec_repro2_dodecane_lu.ll
+```
+
+Example: Pele repro → fuzz the `pc_cmpflx_launch` kernel
+
+```
+./tools/spill_fuzz/pele_hip_to_ll.sh -t pelec_repro2_dodecane_lu
+./tools/spill_fuzz/extract_amdgpu_kernels.sh --demangle --strip-debug \
+  kernels/pele/pelec_repro2_dodecane_lu.ll
+mkdir -p /tmp/pele-fuzz
+cp kernels/pele/kernel-pc_cmpflx_launch*.ll /tmp/pele-fuzz/
+./tools/spill_fuzz/spill_fuzz.py \
+  --corpus /tmp/pele-fuzz \
+  --llc /opt/rocm-6.4.4/lib/llvm/bin/llc \
+  --mcpu gfx942 \
+  --passes greedy \
+  --iterations 1
+```
+
+Devcontainer alias (optional):
+
+```
+alias dcv='devcontainer exec --workspace-folder . -- bash -lc'
+```

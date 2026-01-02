@@ -9,7 +9,8 @@ Options:
   -o, --out <dir>     Output directory (default: directory of input)
   -r, --rocm <path>   ROCm install prefix (default: auto-detect)
   -l, --list          List kernel names and exit
-  -d, --demangle      Demangle kernel names for listing/output files
+  -d, --demangle      Demangle kernel names for listing/output files (default)
+  -s, --strip-debug   Strip debug info from extracted kernels
   -h, --help          Show this help
 
 This extracts each amdgpu_kernel into its own .ll using opt internalize+GDC.
@@ -20,7 +21,8 @@ out_dir=""
 rocm_path=""
 input_ll=""
 list_only="false"
-demangle="false"
+demangle="true"
+strip_debug="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -38,6 +40,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     -d|--demangle)
       demangle="true"
+      shift
+      ;;
+    -s|--strip-debug)
+      strip_debug="true"
       shift
       ;;
     -h|--help)
@@ -197,9 +203,14 @@ while IFS= read -r kernel; do
         name_hash="$(echo -n "${kernel}" | cksum | awk '{print $1}')"
       fi
     fi
-    out_ll="${out_dir}/kernel-${safe_kernel}-${name_hash}.ll"
+  out_ll="${out_dir}/kernel-${safe_kernel}-${name_hash}.ll"
   fi
-  "${opt_tool}" -S -passes="internalize,globaldce" \
+  opt_passes="internalize,globaldce"
+  opt_args=()
+  if [[ "${strip_debug}" == "true" ]]; then
+    opt_args+=("-strip-debug")
+  fi
+  "${opt_tool}" -S -passes="${opt_passes}" "${opt_args[@]}" \
     -internalize-public-api-list="${kernel}" \
     "${input_ll}" -o "${out_ll}"
   echo "Wrote ${out_ll}"
