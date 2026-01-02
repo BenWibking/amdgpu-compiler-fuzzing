@@ -82,11 +82,15 @@ ll_path="${kernels_dir}/${target}.ll"
 llvm_dis_candidates=(
   "${ROCM_PATH}/lib/llvm/bin/llvm-dis"
   "${ROCM_PATH}/llvm/bin/llvm-dis"
+  /opt/rocm-*/lib/llvm/bin/llvm-dis
+  /opt/rocm-*/llvm/bin/llvm-dis
   "llvm-dis"
 )
 llvm_extract_candidates=(
   "${ROCM_PATH}/lib/llvm/bin/llvm-extract"
   "${ROCM_PATH}/llvm/bin/llvm-extract"
+  /opt/rocm-*/lib/llvm/bin/llvm-extract
+  /opt/rocm-*/llvm/bin/llvm-extract
   "llvm-extract"
 )
 
