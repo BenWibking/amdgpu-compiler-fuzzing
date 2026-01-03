@@ -57,6 +57,7 @@ RUN if ! command -v clspv >/dev/null 2>&1; then \
     (git clone --depth 1 https://github.com/google/clspv.git /tmp/clspv && \
      cd /tmp/clspv && \
      git submodule update --init && \
+     python3 utils/fetch_sources.py && \
      cmake -S . -B build \
        -DCMAKE_BUILD_TYPE=Release \
        -DLLVM_CONFIG=/opt/rocm/llvm/bin/llvm-config && \
