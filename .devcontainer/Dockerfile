@@ -62,7 +62,7 @@ RUN if ! command -v clspv >/dev/null 2>&1; then \
        -DCMAKE_BUILD_TYPE=Release \
        -DLLVM_CONFIG=/opt/rocm/llvm/bin/llvm-config \
        -DPython3_EXECUTABLE=/usr/bin/python3.9 && \
-     cmake --build build -j\"$(nproc)\" && \
+     cmake --build build --parallel $(nproc) && \
      cmake --install build && \
      rm -rf /tmp/clspv); \
   fi
