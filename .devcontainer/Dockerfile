@@ -45,10 +45,25 @@ ENV CXX=amdclang++
 
 # add packages for C++ builds and basic GNU tools
 RUN zypper --non-interactive install --no-recommends \
-    wget tar gzip file gcc gcc-c++ make cmake patch \
+    wget tar gzip file gcc gcc-c++ make cmake ninja patch \
     which coreutils findutils grep gawk sed ripgrep \
     git python3 && \
     zypper clean --all
+
+# Install clspv (preferred) or build from source if unavailable.
+RUN if ! command -v clspv >/dev/null 2>&1; then \
+    (zypper --non-interactive install --no-recommends clspv && \
+     zypper clean --all) || \
+    (git clone --depth 1 https://github.com/google/clspv.git /tmp/clspv && \
+     cd /tmp/clspv && \
+     git submodule update --init && \
+     cmake -S . -B build \
+       -DCMAKE_BUILD_TYPE=Release \
+       -DLLVM_CONFIG=/opt/rocm/llvm/bin/llvm-config && \
+     cmake --build build -j\"$(nproc)\" && \
+     cmake --install build && \
+     rm -rf /tmp/clspv); \
+  fi
 
 # create user 'leap'
 RUN useradd -ms /bin/bash leap
