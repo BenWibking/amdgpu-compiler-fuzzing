@@ -47,7 +47,7 @@ ENV CXX=amdclang++
 RUN zypper --non-interactive install --no-recommends \
     wget tar gzip file gcc gcc-c++ make cmake ninja patch \
     which coreutils findutils grep gawk sed ripgrep \
-    git python3 python39 && \
+    git python3 python39 vulkan-devel && \
     zypper clean --all
 
 # Install clspv (preferred) or build from source if unavailable.
@@ -75,3 +75,7 @@ USER leap
 
 # Set the default command to bash
 CMD [ "/bin/bash" ]
+
+# Final layer: Vulkan headers/libraries for vk_aco_compile
+RUN zypper --non-interactive install --no-recommends vulkan-devel && \
+    zypper clean --all

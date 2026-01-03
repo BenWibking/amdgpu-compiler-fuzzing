@@ -1,6 +1,5 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 
-#include <float.h>
 #include "dodecane_lu_opencl.h"
 
 #define URHO 0
@@ -43,7 +42,9 @@
 #define UFS (UFA + NUM_ADV)
 #define QFS (QFA + NUM_ADV)
 
-static const double constants_RU = 8.31446261815324e7;
+static __constant double constants_RU = 8.31446261815324e7;
+static __constant double cl_dbl_epsilon = 2.2204460492503131e-16;
+static __constant double cl_dbl_min = 2.2250738585072014e-308;
 
 static inline double constants_smallu(void)
 {
@@ -57,12 +58,12 @@ static inline double constants_small_num(void)
 
 static inline double constants_very_small_num(void)
 {
-  return DBL_EPSILON * 1e-100;
+  return cl_dbl_epsilon * 1e-100;
 }
 
 static inline void
 pc_cmpflx_passive(const double ustar, const double flxrho, const double ql,
-                  const double qr, double *flx)
+                  const double qr, __global double *flx)
 {
   if (ustar > 0.0) {
     *flx = flxrho * ql;
@@ -82,7 +83,7 @@ static inline void RPY2Cs(const double R, const double P,
   double Cv = 0.0;
   double G;
 
-  CKMMWY(Y, wbar);
+  CKMMWY(Y, &wbar);
   T = P * wbar / (R * constants_RU);
   CKCVMS(T, tmp);
   for (int i = 0; i < NUM_SPECIES; i++) {
@@ -99,7 +100,7 @@ static inline void RYP2E(const double R, const double Y[NUM_SPECIES],
   double T;
   double ei[NUM_SPECIES];
 
-  CKMMWY(Y, wbar);
+  CKMMWY(Y, &wbar);
   T = P * wbar / (R * constants_RU);
   CKUMS(T, ei);
   *E = 0.0;
@@ -113,12 +114,14 @@ static inline void riemann(
     const double pl, const double spl[NUM_SPECIES], const double rr,
     const double ur, const double vr, const double v2r, const double pr,
     const double spr[NUM_SPECIES], const int bc_test_val, const double cav,
-    double *ustar, double *uflx_rho, double uflx_rhoY[NUM_SPECIES],
-    double *uflx_u, double *uflx_v, double *uflx_w, double *uflx_eden,
-    double *uflx_eint, double *qint_iu, double *qint_iv1, double *qint_iv2,
-    double *qint_gdpres, double *qint_gdgame)
+    __private double *ustar, __global double *uflx_rho,
+    __private double uflx_rhoY[NUM_SPECIES], __global double *uflx_u,
+    __global double *uflx_v, __global double *uflx_w, __global double *uflx_eden,
+    __global double *uflx_eint, __global double *qint_iu,
+    __global double *qint_iv1, __global double *qint_iv2,
+    __global double *qint_gdpres, __global double *qint_gdgame)
 {
-  const double wsmall = DBL_MIN;
+  const double wsmall = cl_dbl_min;
 
   double gdnv_state_massfrac[NUM_SPECIES];
   for (int n = 0; n < NUM_SPECIES; n++) {
@@ -136,7 +139,7 @@ static inline void riemann(
   const double wl = fmax(wsmall, cl * rl);
   const double wr = fmax(wsmall, cr * rr);
   const double pstar = fmax(
-      DBL_MIN, ((wr * pl + wl * pr) + wl * wr * (ul - ur)) / (wl + wr));
+      cl_dbl_min, ((wr * pl + wl * pr) + wl * wr * (ul - ur)) / (wl + wr));
   *ustar = ((wl * ul + wr * ur) + (pl - pr)) / (wl + wr);
 
   int mask = *ustar > 0.0;

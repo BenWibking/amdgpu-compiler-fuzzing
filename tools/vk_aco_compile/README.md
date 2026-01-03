@@ -18,6 +18,16 @@ ACO_DEBUG=validate,info \
 ./vk_aco_compile ../../pc_cmpflx.spv pc_cmpflx_launch 0 0
 ```
 
+OpenCL note:
+- Use OpenCL 1.2 for clspv builds of `pc_cmpflx_opencl.cl`; CL2.0 currently
+  triggers a clspv segfault in this environment.
+
+SPIR-V environment check:
+
+```sh
+python3 ../../tools/spirv_env_check.py ../../pc_cmpflx_from_llvm.spv
+```
+
 Arguments:
 - `spv_path`: SPIR-V module to load.
 - `entry`: entry point name (default `pc_cmpflx_launch`).

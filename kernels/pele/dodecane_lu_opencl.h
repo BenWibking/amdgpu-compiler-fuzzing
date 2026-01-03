@@ -1,15 +1,15 @@
 #ifndef PELE_DODECANE_LU_OPENCL_H
 #define PELE_DODECANE_LU_OPENCL_H
 
-#define AMREX_GPU_DEVICE inline
-#define AMREX_GPU_HOST_DEVICE inline
-#define AMREX_FORCE_INLINE inline __attribute__((always_inline))
+#define AMREX_GPU_DEVICE static inline
+#define AMREX_GPU_HOST_DEVICE static inline
+#define AMREX_FORCE_INLINE __attribute__((always_inline))
 #define AMREX_NO_INLINE __attribute__((noinline))
 
 #define NUM_SPECIES 53
 
 //  inverse molecular weights
-__constant double global_imw[NUM_SPECIES] = {
+static __constant double global_imw[NUM_SPECIES] = {
   0.0058706117177410, // NC12H26
   0.9920634920634921, // H
   0.0625039064941559, // O
@@ -68,7 +68,7 @@ __constant double global_imw[NUM_SPECIES] = {
 // given y[species]: mass fractions
 // s mean molecular weight (gm/mole)
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void
-CKMMWY(const double y[], double& wtm)
+CKMMWY(const double y[], double *wtm)
 {
   double YOW = 0;
 
@@ -76,7 +76,7 @@ CKMMWY(const double y[], double& wtm)
     YOW += y[i] * global_imw[i];
   }
 
-  wtm = 1.0 / YOW;
+  *wtm = 1.0 / YOW;
 }
 
 // compute Cv/R at the given temperature

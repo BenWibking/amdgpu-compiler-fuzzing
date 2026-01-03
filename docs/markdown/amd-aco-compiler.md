@@ -360,6 +360,31 @@ still requires AMD‑specific legalization (features, address spaces, ABI,
 exec masks, atomics), but it keeps the integration surface clear and
 lets ACO do what it’s good at.
 
+## option to use ACO now: rewrite kernels in OpenCL
+
+If the LLVM path takes 1-2 years, there is a pragmatic alternative today: rewrite the hottest kernels in OpenCL and run them through Mesa's ACO pipeline. This is not a perfect drop-in replacement for HIP, but it can be a targeted escape hatch for the kernels most likely to trigger spill failures.
+
+Concrete toolchain paths:
+
+- **Rusticl + Mesa + ACO (OpenCL runtime path):**
+  OpenCL C → SPIR-V (clang) → rusticl (Mesa OpenCL) → NIR → ACO → AMDGPU ISA.
+  This is the most direct way to get OpenCL kernels onto ACO today.
+- **clspv + Vulkan + RADV + ACO (Vulkan compute path):**
+  OpenCL C → SPIR-V (clspv) → Vulkan compute → RADV → NIR → ACO.
+  This is not OpenCL, but it can work if you're willing to drive kernels through Vulkan instead of an OpenCL runtime.
+
+If you want a true OpenCL runtime, rusticl is the answer. If you can tolerate a Vulkan compute path, clspv is viable and has a mature SPIR-V backend.
+
+Key tradeoffs and constraints:
+
+- **Feature mismatch:** HIP and OpenCL are not one-to-one. You may need to replace HIP intrinsics, rework pointer/address-space usage, and avoid newer language features.
+- **Tooling friction:** The build and runtime toolchain will change. Expect new compiler flags, different debug info, and different profiling workflows.
+- **Kernel-only scope:** This is a kernel rewrite, not a full host-side port. Keep the host code in HIP or C++ and swap in OpenCL kernels for the hot paths.
+- **Performance risk:** ACO tends to be more stable under high register pressure, but performance is not guaranteed to match HIP+LLVM out of the box. Expect tuning work.
+- **Maintenance cost:** You will likely maintain two versions of the same kernel logic until the LLVM path improves.
+
+This is not a long-term answer, but it is a way to get ACO's SSA-based spill behavior today for the most fragile kernels, without waiting on a multi-year compiler rewrite.
+
 ## TL;DR
 
 ACO is better designed for AMDGPU codegen because it is **GPU‑first** and
@@ -381,3 +406,15 @@ Most importantly, the clean SSA-based compiler design means that HIP developers
 can stop playing "whack-a-mole" in an endless cycle of writing reproducers for register spill bugs, getting them fixed in the next ROCm point release, and then seeing new corner cases that cause production code to crash on the biggest supercomputer in the world...
 
 Yes, it's been frustrating. I hope AMD execs listen and have the real long-term vision to fix this architecturally.
+
+## alterative path to ACO: fix LLVM
+
+If AMD decides not to push HIP onto ACO, the only viable long-term alternative is to structurally fix LLVM's AMDGPU backend so it prevents the same spill failure modes that ACO avoids by design. That means changing the backend architecture, not adding more late fixes:
+
+- **Make register allocation spill-free:** turn RA into a pure mapping step by banning post-RA spill insertion. If pressure is too high, rerun the SSA spill pass instead of spilling late.
+- **Insert all spills in SSA MIR:** add an early SSA-level spill pass that inserts explicit spill/reload ops before regalloc. Keep MIR in SSA until all spill decisions are final.
+- **Encode register classes explicitly:** treat whole-wave values as a separate linear VGPR class and enforce non-overlap with per-lane VGPRs.
+- **Model EXEC/WQM in SSA:** make mask changes explicit in SSA so spill placement respects masked execution and dominance.
+- **Minimize PEI to frame lowering only:** PEI should only lower known frame indices from SSA spills, not invent new spills or late stack objects.
+
+This is effectively an ACO-style compiler path inside LLVM: SSA-first spills, RA as mapping, and explicit modeling of GPU-specific execution semantics. Anything short of this will keep the same late-spill risk surface that has produced years of correctness fixes.
