@@ -47,7 +47,7 @@ ENV CXX=amdclang++
 RUN zypper --non-interactive install --no-recommends \
     wget tar gzip file gcc gcc-c++ make cmake ninja patch \
     which coreutils findutils grep gawk sed ripgrep \
-    git python3 && \
+    git python3 python39 && \
     zypper clean --all
 
 # Install clspv (preferred) or build from source if unavailable.
@@ -57,10 +57,11 @@ RUN if ! command -v clspv >/dev/null 2>&1; then \
     (git clone --depth 1 https://github.com/google/clspv.git /tmp/clspv && \
      cd /tmp/clspv && \
      git submodule update --init && \
-     python3 utils/fetch_sources.py && \
+     python3.9 utils/fetch_sources.py && \
      cmake -S . -B build \
        -DCMAKE_BUILD_TYPE=Release \
-       -DLLVM_CONFIG=/opt/rocm/llvm/bin/llvm-config && \
+       -DLLVM_CONFIG=/opt/rocm/llvm/bin/llvm-config \
+       -DPython3_EXECUTABLE=/usr/bin/python3.9 && \
      cmake --build build -j\"$(nproc)\" && \
      cmake --install build && \
      rm -rf /tmp/clspv); \
