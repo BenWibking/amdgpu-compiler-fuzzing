@@ -68,8 +68,13 @@ RUN if ! command -v clspv >/dev/null 2>&1; then \
   fi
 
 
-# Final layer: Vulkan headers/libraries for vk_aco_compile
-RUN zypper --non-interactive install --no-recommends vulkan-devel && \
+# Final layer: Vulkan headers/loader/ICD for vk_aco_compile
+RUN zypper --non-interactive install --no-recommends \
+    vulkan-devel \
+    vulkan-loader \
+    vulkan-tools \
+    Mesa-vulkan-radeon \
+    Mesa-vulkan-device-select && \
     zypper clean --all
 
 # create user 'leap'
