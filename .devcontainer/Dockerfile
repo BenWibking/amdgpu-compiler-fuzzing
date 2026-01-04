@@ -67,6 +67,11 @@ RUN if ! command -v clspv >/dev/null 2>&1; then \
      rm -rf /tmp/clspv); \
   fi
 
+
+# Final layer: Vulkan headers/libraries for vk_aco_compile
+RUN zypper --non-interactive install --no-recommends vulkan-devel && \
+    zypper clean --all
+
 # create user 'leap'
 RUN useradd -ms /bin/bash leap
 RUN usermod -a -G render,video leap
@@ -75,7 +80,3 @@ USER leap
 
 # Set the default command to bash
 CMD [ "/bin/bash" ]
-
-# Final layer: Vulkan headers/libraries for vk_aco_compile
-RUN zypper --non-interactive install --no-recommends vulkan-devel && \
-    zypper clean --all
